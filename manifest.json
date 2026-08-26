@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "Quillan-Ronin Agent",
+  "version": "1.4.0",
+  "description": "Quillan-Ronin AI agent — talks to your local QuillanWorker stack via NVIDIA NIM. Can read the active page.",
+  "action": {
+    "default_title": "Quillan-Ronin",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "sidePanel",
+    "debugger",
+    "tabs",
+    "storage",
+    "unlimitedStorage",
+    "offscreen",
+    "alarms",
+    "webNavigation",
+    "tabCapture",
+    "desktopCapture",
+    "cookies",
+    "history",
+    "bookmarks",
+    "downloads",
+    "browsingData",
+    "topSites",
+    "sessions",
+    "windows",
+    "tabGroups",
+    "contextMenus",
+    "commands",
+    "notifications",
+    "identity",
+    "privacy",
+    "pageCapture",
+    "declarativeNetRequest",
+    "webRequest",
+    "contentSettings",
+    "management",
+    "system.display"
+  ],
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "host_permissions": [
+    "http://localhost:7777/*",
+    "http://127.0.0.1:7777/*",
+    "<all_urls>"
+  ]
+}
