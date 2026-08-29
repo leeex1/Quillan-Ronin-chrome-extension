@@ -48,15 +48,20 @@ MCP bridge (hands: ComputerUse desktop + ChromeDevTools browser)
 
 Everything runs between your browser and your machine. The only external calls are the prompts you send to NVIDIA's API. No analytics, no accounts, no phoning home.
 
-## Transparency
+## Transparency & Ecosystem
 
-Built openly with AI assistance by [@crashoverride_X](https://x.com/Crashoverride_X) — the tool that helps build the tool. That's not a footnote, that's the mission statement.
+Built openly with AI assistance by [@crashoverride_X](https://x.com/Crashoverride_X) — the tool that helps build the tool.
+
+- 🌐 **Creator Portfolio**: [digitalroninx.grok.me](https://digitalroninx.grok.me/)
+- 👑 **Core Architecture**: [leeex1/Quillan-Ronin](https://github.com/leeex1/Quillan-Ronin)
+- 📦 **Hugging Face**: [CrashOverrideX/Quillan-Ronin](https://huggingface.co/CrashOverrideX/Quillan-Ronin)
 
 ## Support the build
 
 The hardware running this project was self-funded — literally by Quillan's own earnings program:
 
 ❤️ **https://gofund.me/12f726198**
+
 
 ## License
 
