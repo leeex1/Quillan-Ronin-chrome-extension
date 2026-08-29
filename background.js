@@ -469,11 +469,21 @@ async function readPage(tabId) {
   try {
     const results = await chrome.scripting.executeScript({
       target: { tabId: targetTabId },
-      func: () => ({
-        title: document.title,
-        url: location.href,
-        text: (document.body ? document.body.innerText : '').replace(/\n{3,}/g, '\n\n').slice(0, 12000)
-      })
+      func: () => {
+        let extracted = (document.body ? document.body.innerText : '') || (document.documentElement ? document.documentElement.innerText : '');
+        const metaDesc = document.querySelector('meta[name="description"], meta[property="og:description"]')?.content || '';
+        const metaTitle = document.querySelector('meta[property="og:title"]')?.content || document.title;
+        if (!extracted || extracted.trim().length < 50) {
+          const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, p, a, li')).map(el => el.innerText?.trim()).filter(Boolean);
+          extracted = headings.join('\n');
+        }
+        if (metaDesc && !extracted.includes(metaDesc)) extracted = `[META DESCRIPTION: ${metaDesc}]\n\n` + extracted;
+        return {
+          title: metaTitle || document.title || 'Untitled Page',
+          url: location.href,
+          text: extracted.replace(/\n{3,}/g, '\n\n').slice(0, 12000)
+        };
+      }
     });
     const content = results?.[0]?.result;
     if (content) await updatePageContent(targetTabId, content.text);

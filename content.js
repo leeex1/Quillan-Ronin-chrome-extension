@@ -18,13 +18,28 @@ let badgeContainer = null;
 // Message dispatcher for background and popup requests
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
-    case 'getPageContent':
+    case 'getPageContent': {
+      let extracted = (document.body ? document.body.innerText : '') || (document.documentElement ? document.documentElement.innerText : '');
+      const metaDesc = document.querySelector('meta[name="description"], meta[property="og:description"]')?.content || '';
+      const metaTitle = document.querySelector('meta[property="og:title"]')?.content || document.title;
+      
+      // If basic innerText is sparse, collect structured headings and links
+      if (!extracted || extracted.trim().length < 50) {
+        const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, p, a, li')).map(el => el.innerText?.trim()).filter(Boolean);
+        extracted = headings.join('\n');
+      }
+      
+      if (metaDesc && !extracted.includes(metaDesc)) {
+        extracted = `[META DESCRIPTION: ${metaDesc}]\n\n` + extracted;
+      }
+
       sendResponse({
-        title: document.title,
+        title: metaTitle || document.title || 'Untitled Page',
         url: window.location.href,
-        text: (document.body ? document.body.innerText : '').replace(/\n{3,}/g, '\n\n').slice(0, MAX_TEXT_LENGTH)
+        text: extracted.replace(/\n{3,}/g, '\n\n').slice(0, MAX_TEXT_LENGTH)
       });
       break;
+    }
 
     case 'getPageStructure':
       sendResponse({ structure: extractPageStructure() });

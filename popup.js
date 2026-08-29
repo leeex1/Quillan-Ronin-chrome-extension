@@ -266,9 +266,15 @@ async function collectGoogleLinks(tabId){
       });
       return out.slice(0, GOOGLE_LINKS_MAX);
     }});
-    return rs?.[0]?.result||[];
-  }catch{return [];
-    /\bprompt.*about (yourself|quillan)\b/i.test(l) ||
+    return rs?.[0]?.result || [];
+  } catch {
+    return [];
+  }
+}
+
+function isPromptModelIntent(msg) {
+  const l = String(msg).toLowerCase();
+  return /\bprompt.*about (yourself|quillan)\b/i.test(l) ||
     /\btype a message to it\b/i.test(l) ||
     (/\bask.*about quillan\b/i.test(l) && /google|ai mode/i.test(l)) ||
     (/\bprompt\b/i.test(l) && /\bopen tab\b/i.test(l));
@@ -493,7 +499,21 @@ async function fetchPageForGrounding() {
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => ({ title: document.title, url: location.href, text: (document.body ? document.body.innerText : '').slice(0, PAGE_CONTENT_MAX_LENGTH) })
+        func: () => {
+          let extracted = (document.body ? document.body.innerText : '') || (document.documentElement ? document.documentElement.innerText : '');
+          const metaDesc = document.querySelector('meta[name="description"], meta[property="og:description"]')?.content || '';
+          const metaTitle = document.querySelector('meta[property="og:title"]')?.content || document.title;
+          if (!extracted || extracted.trim().length < 50) {
+            const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, p, a, li')).map(el => el.innerText?.trim()).filter(Boolean);
+            extracted = headings.join('\n');
+          }
+          if (metaDesc && !extracted.includes(metaDesc)) extracted = `[META DESCRIPTION: ${metaDesc}]\n\n` + extracted;
+          return {
+            title: metaTitle || document.title || 'Untitled Page',
+            url: location.href,
+            text: extracted.replace(/\n{3,}/g, '\n\n').slice(0, 10000)
+          };
+        }
       });
       if (results?.[0]?.result?.text) return results[0].result;
     } catch {}
