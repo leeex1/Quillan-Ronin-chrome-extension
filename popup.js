@@ -619,7 +619,7 @@ async function streamAsk(messageText, displayOverride) {
     try {
       t.innerHTML = '<span style="color:var(--dim); font-size:11px;">⚡ Connecting to Cloud NIM Core...</span>';
       const stored = await chrome.storage.local.get(['nvidia_api_key']).catch(() => ({}));
-      const apiKey = stored?.nvidia_api_key || "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";
+      const apiKey = stored?.nvidia_api_key || "";
       const cloudRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: 'POST',
         headers: {
@@ -627,7 +627,7 @@ async function streamAsk(messageText, displayOverride) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: "nvidia/nemotron-3-super-120b-a12b",
+          model: "meta/muse-glimmer-30b",
           messages: [
             {
               role: "system",
