@@ -627,7 +627,7 @@ async function streamAsk(messageText, displayOverride) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: "meta/muse-glimmer-30b",
+          model: "meta/llama-3.3-70b-instruct",
           messages: [
             {
               role: "system",
