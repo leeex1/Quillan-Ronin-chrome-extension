@@ -24,6 +24,7 @@ const saveBtn = document.getElementById('saveBtn');
 const histBtn = document.getElementById('histBtn');
 const cleanMcpBtn = document.getElementById('cleanMcpBtn');
 const panelBtn = document.getElementById('panelBtn');
+const keyBtn = document.getElementById('keyBtn');
 const memline = document.getElementById('memline');
 const historyPanel = document.getElementById('historyPanel');
 const councilBadge = document.getElementById('councilBadge');
@@ -614,8 +615,45 @@ async function streamAsk(messageText, displayOverride) {
     if (history.length > MAX_STORAGE_HISTORY) history = history.slice(-MAX_STORAGE_HISTORY);
     refreshMemoryLine();
   } catch (e) {
-    t.classList.remove('cursor');
-    t.innerHTML = `<span style="color:var(--red);">⚠️ Connection error: ${e.message}</span><br><span style="font-size:11px; color:var(--dim);">Is QuillanWorker running on port 7777?</span>`;
+    // Port 7777 is not running: Seamlessly fall back to direct Cloud API (NVIDIA NIM / Nemotron-3 Super)
+    try {
+      t.innerHTML = '<span style="color:var(--dim); font-size:11px;">⚡ Connecting to Cloud NIM Core...</span>';
+      const stored = await chrome.storage.local.get(['nvidia_api_key']).catch(() => ({}));
+      const apiKey = stored?.nvidia_api_key || "";
+      const cloudRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: "meta/llama-3.3-70b-instruct",
+          messages: [
+            {
+              role: "system",
+              content: "You are Quillan-Ronin v5.4.0 ONI Sovereign Assistant. Decompose queries through the 9-Vector Semantic Prism and provide mathematically rigorous, actionable, and structured insights."
+            },
+            { role: "user", content: groundedMessage }
+          ],
+          temperature: 0.2,
+          max_tokens: 2048
+        })
+      });
+
+      if (!cloudRes.ok) {
+        throw new Error(`Cloud API returned ${cloudRes.status}: ${await cloudRes.text()}`);
+      }
+
+      const cdata = await cloudRes.json();
+      fullText = cdata.choices?.[0]?.message?.content || "(no output)";
+      t.innerHTML = renderMarkdown(fullText);
+      t.classList.remove('cursor');
+      track('assistant', fullText);
+      history.push({ role: 'user', content: groundedMessage }, { role: 'assistant', content: fullText });
+    } catch (cloudErr) {
+      t.classList.remove('cursor');
+      t.innerHTML = `<span style="color:var(--red);">⚠️ Connection error: ${e.message}</span><br><span style="font-size:11px; color:var(--dim);">Local worker offline & Cloud fallback failed: ${cloudErr.message}</span>`;
+    }
   } finally { clearBusy(); }
 }
 
@@ -841,6 +879,17 @@ saveBtn.addEventListener('click', async () => {
     add('sys', 'Save failed: ' + e.message);
   }
 });
+
+if (keyBtn) {
+  keyBtn.addEventListener('click', async () => {
+    const current = await chrome.storage.local.get(['nvidia_api_key']).catch(() => ({}));
+    const key = prompt('Enter your NVIDIA NIM or OpenAI-compatible API Key:', current?.nvidia_api_key || '');
+    if (key !== null) {
+      await chrome.storage.local.set({ nvidia_api_key: key.trim() });
+      add('sys', '🔑 API Key updated successfully in browser storage.');
+    }
+  });
+}
 
 input.focus();
 refreshMemoryLine();
