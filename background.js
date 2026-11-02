@@ -431,7 +431,12 @@ async function evaluate(tabId, expression) {
     const results = await chrome.scripting.executeScript({
       target: { tabId: targetTabId },
       func: (expr) => {
-        try { return { value: String(eval(expr)) }; }
+        try {
+          if (typeof expr !== 'string') return { error: 'Expression must be a string' };
+          // Guarded execution under strict mode without global eval
+          const runExpr = new Function('"use strict"; return (' + expr + ')');
+          return { value: String(runExpr()) };
+        }
         catch (e) { return { error: e.message }; }
       },
       args: [expression]
