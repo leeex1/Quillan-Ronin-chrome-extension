@@ -615,44 +615,69 @@ async function streamAsk(messageText, displayOverride) {
     if (history.length > MAX_STORAGE_HISTORY) history = history.slice(-MAX_STORAGE_HISTORY);
     refreshMemoryLine();
   } catch (e) {
-    // Port 7777 is not running: Seamlessly fall back to direct Cloud API (NVIDIA NIM / Nemotron-3 Super)
+    // Port 7777 is offline: try local Sovereign (:8080), then local Ollama (:11434), then Cloud NIM
     try {
-      t.innerHTML = '<span style="color:var(--dim); font-size:11px;">⚡ Connecting to Cloud NIM Core...</span>';
-      const stored = await chrome.storage.local.get(['nvidia_api_key']).catch(() => ({}));
-      const apiKey = stored?.nvidia_api_key || "";
-      const cloudRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: "meta/llama-3.3-70b-instruct",
-          messages: [
-            {
-              role: "system",
-              content: "You are Quillan-Ronin v5.4.0 ONI Sovereign Assistant. Decompose queries through the 9-Vector Semantic Prism and provide mathematically rigorous, actionable, and structured insights."
-            },
-            { role: "user", content: groundedMessage }
-          ],
-          temperature: 0.2,
-          max_tokens: 2048
-        })
-      });
-
-      if (!cloudRes.ok) {
-        throw new Error(`Cloud API returned ${cloudRes.status}: ${await cloudRes.text()}`);
+      const sysPrompt = "You are Quillan-Ronin Sovereign Assistant. Provide precise, actionable, and structured insights.";
+      const msgs = [{ role: "system", content: sysPrompt }, ...history.slice(-8), { role: "user", content: groundedMessage }];
+      const localTargets = [
+        { label: "Sovereign Core (:8080)", url: "http://127.0.0.1:8080/v1/chat/completions", model: "quillan-ronin-flagship" },
+        { label: "Ollama Core (:11434)", url: "http://127.0.0.1:11434/v1/chat/completions", model: "quillan-ronin-1b:latest" }
+      ];
+      let resolvedText = null;
+      const errors = [];
+      for (const target of localTargets) {
+        try {
+          t.innerHTML = `<span style="color:var(--dim); font-size:11px;">⚡ Connecting to ${target.label}...</span>`;
+          const localRes = await fetch(target.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: target.model, messages: msgs, temperature: 0.3, max_tokens: 1024 }),
+            signal: AbortSignal.timeout(15000)
+          });
+          if (!localRes.ok) throw new Error(`HTTP ${localRes.status}`);
+          const ldata = await localRes.json();
+          const candidate = ldata.choices?.[0]?.message?.content;
+          if (candidate) { resolvedText = candidate; break; }
+          throw new Error('empty completion');
+        } catch (le) {
+          errors.push(`${target.label}: ${le.message}`);
+        }
+      }
+      if (!resolvedText) {
+        t.innerHTML = '<span style="color:var(--dim); font-size:11px;">⚡ Connecting to Cloud NIM Core...</span>';
+        const stored = await chrome.storage.local.get(['nvidia_api_key']).catch(() => ({}));
+        const apiKey = (stored?.nvidia_api_key || "").trim();
+        if (!apiKey) {
+          throw new Error(`Local cores unavailable (${errors.join('; ')}) and no nvidia_api_key saved in extension storage`);
+        }
+        const cloudRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: "nvidia/nemotron-3.5-lightning-30b-a3b",
+            messages: msgs,
+            temperature: 0.2,
+            max_tokens: 2048
+          })
+        });
+        if (!cloudRes.ok) {
+          throw new Error(`Cloud API returned ${cloudRes.status}: ${await cloudRes.text()}`);
+        }
+        const cdata = await cloudRes.json();
+        resolvedText = cdata.choices?.[0]?.message?.content || "(no output)";
       }
 
-      const cdata = await cloudRes.json();
-      fullText = cdata.choices?.[0]?.message?.content || "(no output)";
+      fullText = resolvedText;
       t.innerHTML = renderMarkdown(fullText);
       t.classList.remove('cursor');
       track('assistant', fullText);
       history.push({ role: 'user', content: groundedMessage }, { role: 'assistant', content: fullText });
     } catch (cloudErr) {
       t.classList.remove('cursor');
-      t.innerHTML = `<span style="color:var(--red);">⚠️ Connection error: ${e.message}</span><br><span style="font-size:11px; color:var(--dim);">Local worker offline & Cloud fallback failed: ${cloudErr.message}</span>`;
+      t.innerHTML = `<span style="color:var(--red);">⚠️ Connection error: ${e.message}</span><br><span style="font-size:11px; color:var(--dim);">Fallbacks failed: ${cloudErr.message}</span>`;
     }
   } finally { clearBusy(); }
 }
